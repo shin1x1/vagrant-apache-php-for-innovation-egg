@@ -1,0 +1,58 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vm.box = "centos64_ja"
+  config.vm.box_url = "https://dl.dropboxusercontent.com/u/3657281/centos64_ja.box"
+  config.vm.hostname = "vagrant-apache-php-for-innovation-egg"
+
+  config.vm.network :private_network, ip: "192.168.33.30"
+  #config.vm.synced_folder "../", "/share", :nfs => true
+  config.vm.synced_folder "../", "/share", \
+        create: true, owner: 'vagrant', group: 'vagrant', \
+        mount_options: ['dmode=777,fmode=666']
+
+  config.vm.provider :virtualbox do |vb|
+    vb.name = "vagrant-apache-php-for-innovation-egg"
+    vb.gui = true
+    #vb.customize ["modifyvm", :id, "--memory", 1024]
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+  end
+
+  config.vm.provision :shell, :inline => <<-EOT
+    #
+    # iptables off
+    #
+    /sbin/iptables -F
+    /sbin/service iptables stop
+    /sbin/chkconfig iptables off
+    #
+    # yum repository
+    #
+    rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/i386/epel-release-6-8.noarch.rpm
+    rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-6.rpm
+#    #yum -y update
+    #
+    # ntp
+    #
+    yum -y install ntp
+    /sbin/service ntpd start
+    /sbin/chkconfig ntpd on
+    #
+    # php
+    #
+    yum -y install php php-cli php-mbstring php-common php-pear php-pecl-xdebug php-opcache --enablerepo=remi-php55
+    touch /var/log/php.log && chmod 666 /var/log/php.log
+    cp -a /vagrant/php.ini /etc/php.ini
+    #
+    # Apache
+    #
+    cp -a /vagrant/httpd.conf /etc/httpd/conf/
+    /sbin/service httpd restart
+    /sbin/chkconfig httpd on
+  EOT
+end
